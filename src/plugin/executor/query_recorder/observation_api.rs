@@ -20,36 +20,46 @@ const SNAPSHOT_LIMIT: usize = 100;
 
 fn snapshot(backend: &RecorderBackend) -> serde_json::Value {
     let mut rows: Vec<QueryObservation> = backend.observations.snapshots(SNAPSHOT_LIMIT);
-    if let Ok(tail) = backend.tail.lock() {
-        rows.extend(tail.iter().rev().take(SNAPSHOT_LIMIT).map(|record| {
-            if let Some(mut observation) = record.record.observation.clone() {
-                observation.record_id = Some(record.record.id);
-                return observation;
-            }
-            let question = record.record.questions_json.first();
-            QueryObservation {
-                version: 0,
-                id: format!("legacy-{}", record.record.id),
-                record_id: Some(record.record.id),
-                created_at_ms: record.record.created_at_ms,
-                client_ip: record.record.client_ip.clone(),
-                qname: question.map(|q| q.name.clone()).unwrap_or_default(),
-                qtype: question.map(|q| q.qtype.clone()).unwrap_or_default(),
-                status: "not_recorded".into(),
-                elapsed_ms: record.record.elapsed_ms as f64,
-                rcode: record.record.rcode.clone(),
-                answers: record
-                    .record
-                    .answers_json
-                    .iter()
-                    .take(64)
-                    .map(|answer| answer.payload_text.clone())
-                    .collect(),
-                events: Vec::new(),
-                truncated: false,
-            }
-        }));
-    }
+    // Only clone shared handles while holding the writer's publication lock.
+    let tail = backend
+        .tail
+        .lock()
+        .map(|tail| {
+            tail.iter()
+                .rev()
+                .take(SNAPSHOT_LIMIT)
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    rows.extend(tail.iter().map(|record| {
+        if let Some(mut observation) = record.record.observation.clone() {
+            observation.record_id = Some(record.record.id);
+            return observation;
+        }
+        let question = record.record.questions_json.first();
+        QueryObservation {
+            version: 0,
+            id: format!("legacy-{}", record.record.id),
+            record_id: Some(record.record.id),
+            created_at_ms: record.record.created_at_ms,
+            client_ip: record.record.client_ip.clone(),
+            qname: question.map(|q| q.name.clone()).unwrap_or_default(),
+            qtype: question.map(|q| q.qtype.clone()).unwrap_or_default(),
+            status: "not_recorded".into(),
+            elapsed_ms: record.record.elapsed_ms as f64,
+            rcode: record.record.rcode.clone(),
+            answers: record
+                .record
+                .answers_json
+                .iter()
+                .take(64)
+                .map(|answer| answer.payload_text.clone())
+                .collect(),
+            events: Vec::new(),
+            truncated: false,
+        }
+    }));
     rows.sort_by(|a, b| {
         b.created_at_ms
             .cmp(&a.created_at_ms)

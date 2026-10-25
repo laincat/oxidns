@@ -73,7 +73,9 @@ while hidden or paused. SSE publishes snapshots every second and has a
 separate 8-stream concurrency limit. Completed details are stored in the
 existing SQLite payload using the recorder's retention and cleanup behavior.
 Collection adds bounded allocations, locking, serialization and storage work
-when enabled. No DNS-path blocking I/O is added.
+when enabled. Immutable completed records are shared between the memory tail
+and existing SSE subscribers. Observation detail copying occurs outside the
+writer's publication lock. No DNS-path blocking I/O is added.
 
 Observations contain queried names and client IPs. Keep management API
 authentication enabled and protect the database. Detailed collection begins
@@ -81,6 +83,15 @@ at the recorder, so a request short-circuited earlier has no trace here.
 Background probes detached from a query are not presented as completed
 measurements for that query. CF address-list selection and automatic CF
 optimization are outside this change.
+
+## Fork review and attribution
+
+See [the network review](network-review.md) for the branch inventory, exact
+source commits, adapted recorder optimization, static export cache fix and
+features intentionally kept separate. The shared-record and gap-free SSE
+subscription changes adapt wangmice's recorder work; the unversioned route
+metadata cache policy extends the HTML-cache approach already in main from
+ksong008. Existing API payloads and recorder configuration remain compatible.
 
 ## Screenshots from a running build
 

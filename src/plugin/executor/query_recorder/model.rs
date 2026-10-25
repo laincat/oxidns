@@ -3,6 +3,7 @@
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use oxidns_proto::Message;
 use serde::{Deserialize, Serialize};
@@ -130,6 +131,8 @@ pub(super) struct RecordDetail {
     pub(super) record: RecordRow,
     pub(super) steps: Vec<StepJson>,
 }
+
+pub(super) type SharedRecordDetail = Arc<RecordDetail>;
 
 #[derive(Debug, Clone)]
 pub(super) struct PendingRecord {

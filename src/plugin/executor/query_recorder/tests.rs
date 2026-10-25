@@ -1718,6 +1718,30 @@ async fn test_v2_shared_events_multi_questions_and_sse_history_agree() {
                 .unwrap(),
         );
     }
+    let (initial, mut live) = backend.subscribe_tail(2).unwrap();
+    assert_eq!(initial.len(), 2);
+    assert!(std::sync::Arc::ptr_eq(&initial[0], &streamed[1]));
+    assert!(std::sync::Arc::ptr_eq(&initial[1], &streamed[2]));
+    backend.enqueue(pending_record(
+        4,
+        4,
+        "next.example.",
+        RecordType::A,
+        Ipv4Addr::LOCALHOST,
+        Some(Rcode::NoError),
+        None,
+        &[],
+    ));
+    flush_backend(&backend).await;
+    let next = live
+        .try_recv()
+        .expect("record published after the snapshot");
+    assert!(next.record.id > initial.last().unwrap().record.id);
+    assert!(live.try_recv().is_err(), "history must not be sent twice");
+    {
+        let tail = backend.tail.lock().unwrap();
+        assert!(std::sync::Arc::ptr_eq(&next, tail.back().unwrap()));
+    }
     // The WebUI evaluates qname and qtype with separate `some` predicates;
     // they may match different questions in the same list.
     let filter = QueryRecordFilter {
