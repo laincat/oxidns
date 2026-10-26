@@ -32,15 +32,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Cache npm artifacts
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-node20-npm-docs-${{ hashFiles('docs/package-lock.json') }}
+          key: ${{ runner.os }}-node22-npm-docs-${{ hashFiles('docs/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-node20-npm-docs-
+            ${{ runner.os }}-node22-npm-docs-
 
       - name: Install docs dependencies
         working-directory: docs
