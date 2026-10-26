@@ -1,61 +1,73 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+# Daily updates; only signed patch/minor PRs passing affected CI may merge.
 version: 2
-
 updates:
-  - package-ecosystem: "cargo"
-    directory: "/"
+  - package-ecosystem: cargo
+    directory: /
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: daily
       time: "03:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "rust"
+      timezone: Asia/Hong_Kong
+    open-pull-requests-limit: 5
+    labels: [dependencies, rust]
     commit-message:
-      prefix: "deps"
+      prefix: deps
     groups:
       cargo-patch-and-minor:
-        update-types:
-          - "minor"
-          - "patch"
-      cargo-major:
-        update-types:
-          - "major"
+        patterns: ["*"]
+        update-types: [minor, patch]
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: daily
       time: "03:30"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 2
-    labels:
-      - "dependencies"
-      - "github-actions"
+      timezone: Asia/Hong_Kong
+    open-pull-requests-limit: 5
+    labels: [dependencies, github-actions]
     commit-message:
-      prefix: "ci"
+      prefix: ci
     groups:
-      github-actions-all:
-        patterns:
-          - "*"
+      actions-patch-and-minor:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
-  - package-ecosystem: "docker"
-    directory: "/"
+  - package-ecosystem: docker
+    directory: /packaging/docker
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: daily
       time: "04:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 2
-    labels:
-      - "dependencies"
-      - "docker"
+      timezone: Asia/Hong_Kong
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
     commit-message:
-      prefix: "docker"
+      prefix: docker
+
+  - package-ecosystem: npm
+    directory: /webui
+    schedule:
+      interval: daily
+      time: "04:30"
+      timezone: Asia/Hong_Kong
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: deps(webui)
+    groups:
+      webui-patch-and-minor:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: daily
+      time: "05:00"
+      timezone: Asia/Hong_Kong
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: deps(docs)
+    groups:
+      docs-patch-and-minor:
+        patterns: ["*"]
+        update-types: [minor, patch]

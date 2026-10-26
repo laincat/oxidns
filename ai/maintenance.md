@@ -28,14 +28,18 @@ all CI workflows, installer/build documentation, and reusable custom builds.
 
 ## Dependency Update Policy
 
-Dependabot opens weekly grouped updates for:
+Dependabot checks daily for:
 
 - Cargo dependencies.
 - GitHub Actions.
 - Docker dependencies.
+- WebUI and docs JavaScript dependencies, including their lockfiles.
 
-WebUI and docs JavaScript dependencies require explicit maintenance because
-they are not covered by Dependabot.
+Patch/minor updates are grouped separately from major upgrades. Signed
+Dependabot patch/minor PRs merge only after every affected CI workflow passes
+for the current PR head. Major updates and Docker runtime changes require
+review. The ecosystem directories, groups, and schedules are defined in
+`.github/dependabot.yml`; the merge gates live in `.github/scripts/`.
 
 For each dependency update:
 
@@ -188,7 +192,7 @@ Quarterly or before a significant release, check:
 
 ### Monthly
 
-- Update WebUI/docs dependencies in bounded batches.
+- Review WebUI/docs dependency trends and separately proposed major upgrades.
 - Review outdated direct dependencies and patched Git sources.
 - Run or inspect bundle/feature matrix results.
 - Review warnings, deprecations, and platform compatibility notices.

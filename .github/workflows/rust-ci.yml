@@ -11,6 +11,7 @@ on:
       - main
       - "release/*"
     paths:
+      - ".github/**"
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
@@ -23,6 +24,7 @@ on:
       - main
       - "release/*"
     paths:
+      - ".github/**"
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
@@ -44,7 +46,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system packages on Linux
         run: |
@@ -58,7 +60,10 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Test dependency merge gates
+        run: python3 -m unittest discover -s .github/scripts
 
       - name: Check formatting
         run: cargo +nightly fmt --all -- --check
@@ -66,7 +71,7 @@ jobs:
       - name: Run clippy
         run: cargo +nightly clippy --locked --workspace --all-targets --all-features -- -D warnings
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cargo-shear
 
@@ -78,7 +83,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system packages on Linux
         run: |
@@ -92,9 +97,9 @@ jobs:
           components: clippy
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cargo-hack
 
@@ -137,7 +142,7 @@ jobs:
             run_build: false
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system packages on Linux
         if: runner.os == 'Linux'
@@ -151,7 +156,7 @@ jobs:
           toolchain: ${{ matrix.rust }}
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Run tests
         run: cargo test --locked --workspace --all-features --verbose
@@ -165,7 +170,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system packages on Linux
         run: |
@@ -178,7 +183,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       # Exercises the cfg(not(feature = ...)) negative tests in
       # tests/feature_gating.rs and the feature-gated integration tests.
@@ -193,7 +198,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -201,7 +206,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Check documentation
         env:
@@ -214,7 +219,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system packages on Linux
         run: |
@@ -227,9 +232,9 @@ jobs:
           toolchain: nightly
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cargo-hack
 
