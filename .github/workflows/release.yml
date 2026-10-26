@@ -19,15 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: pnpm
@@ -46,7 +46,7 @@ jobs:
         run: pnpm build
 
       - name: Upload WebUI artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: webui-dist
           path: webui/out
@@ -166,7 +166,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -174,13 +174,13 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # The automatic key describes the host toolchain, not the cross target.
           key: ${{ matrix.target }}-full
 
       - name: Download WebUI artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: webui-dist
           path: webui/out
@@ -228,7 +228,7 @@ jobs:
 
       - name: Upload built .deb artifacts
         if: matrix.make_deb
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: oxidns-${{ matrix.target }}.deb
           path: target/debian/*.deb
@@ -238,7 +238,7 @@ jobs:
       - name: Run UPX (supported Linux targets only)
         if: matrix.upx_kind == 'linux'
         continue-on-error: true
-        uses: crazy-max/ghaction-upx@v4
+        uses: crazy-max/ghaction-upx@c83f378efc804f828e988debb88ed6116feb2368 # v4.0.0
         with:
           version: v5.0.2
           files: |
@@ -248,7 +248,7 @@ jobs:
       - name: Run UPX (supported Windows targets only)
         if: matrix.upx_kind == 'windows'
         continue-on-error: true
-        uses: crazy-max/ghaction-upx@v4
+        uses: crazy-max/ghaction-upx@c83f378efc804f828e988debb88ed6116feb2368 # v4.0.0
         with:
           version: v5.0.2
           files: |
@@ -294,7 +294,7 @@ jobs:
             -Force
 
       - name: Upload archive artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: oxidns-${{ matrix.target }}.${{ matrix.archive_ext }}
           path: target/${{ matrix.target }}/release/oxidns-${{ matrix.target }}.${{ matrix.archive_ext }}
@@ -320,7 +320,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -328,7 +328,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # Both target and feature bundle affect reusable dependency artifacts.
           key: ${{ matrix.target }}-${{ matrix.bundle }}
@@ -338,7 +338,7 @@ jobs:
 
       - name: Download WebUI artifact
         if: matrix.bundle == 'standard'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: webui-dist
           path: webui/out
@@ -356,7 +356,7 @@ jobs:
 
       - name: Run UPX
         continue-on-error: true
-        uses: crazy-max/ghaction-upx@v4
+        uses: crazy-max/ghaction-upx@c83f378efc804f828e988debb88ed6116feb2368 # v4.0.0
         with:
           version: v5.0.2
           files: target/${{ matrix.target }}/release/oxidns
@@ -385,7 +385,7 @@ jobs:
           fi
 
       - name: Upload slim archive artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: oxidns-${{ matrix.bundle }}-${{ matrix.target }}.tar.gz
           path: target/${{ matrix.target }}/release/oxidns-${{ matrix.bundle }}-${{ matrix.target }}.tar.gz
@@ -399,10 +399,10 @@ jobs:
     needs: [release, slim-release]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download all release artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: oxidns-*
           merge-multiple: true
@@ -433,7 +433,7 @@ jobs:
           python3 -m unittest discover -s .github/scripts -p '*_test.py'
 
       - name: Create release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             artifacts/*.zip
@@ -478,7 +478,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: publish
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -493,7 +493,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: publish-support-crates
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: dtolnay/rust-toolchain@stable
 
