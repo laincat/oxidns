@@ -1947,8 +1947,9 @@ mod tests {
     #[tokio::test]
     async fn failed_runtime_initialization_preserves_cache_dump() {
         AppClock::start();
-        #[cfg(debug_assertions)]
-        crate::plugin::enable_runtime_test_serialization();
+        #[cfg(feature = "api")]
+        let _guard = crate::api::global_api_test_guard().await;
+        let manager = Arc::new(crate::plugin::PluginRuntimeManager::new());
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("cache.dump");
         let dump_path = path.to_str().unwrap();
@@ -1960,7 +1961,7 @@ mod tests {
         ))
         .unwrap();
 
-        let error = crate::plugin::init(config).await.unwrap_err();
+        let error = manager.init_runtime(config).await.unwrap_err();
         assert!(error.to_string().contains("at least one upstream"));
         assert_eq!(tokio::fs::read(&path).await.unwrap(), original);
     }
@@ -1969,8 +1970,6 @@ mod tests {
     #[tokio::test]
     async fn failed_api_start_preserves_cache_dump_after_initialization() {
         AppClock::start();
-        #[cfg(debug_assertions)]
-        crate::plugin::enable_runtime_test_serialization();
         let _guard = crate::api::global_api_test_guard().await;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();

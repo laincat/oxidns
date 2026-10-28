@@ -47,7 +47,7 @@ pub struct PluginRuntimeManager {
 }
 
 impl PluginRuntimeManager {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             current: RwLock::new(None),
             controller: Mutex::new(None),
