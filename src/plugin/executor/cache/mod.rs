@@ -464,33 +464,6 @@ pub struct Cache {
 }
 
 impl Cache {
-    fn spawn_load_task(
-        &self,
-        cache_map: CacheMap,
-        dump_path: String,
-        ecs_in_key: bool,
-        cache_size: usize,
-    ) {
-        tokio::spawn(async move {
-            if let Err(e) = load_cache_from_file(&cache_map, &dump_path, ecs_in_key).await {
-                warn!("Failed to load cache from {}: {}", dump_path, e);
-                return;
-            }
-
-            let stats =
-                Cache::prune_cache_after_load(&cache_map, cache_size, AppClock::elapsed_millis());
-            if stats.total_removed() > 0 {
-                debug!(
-                    expired_removed = stats.expired_removed,
-                    evicted = stats.evicted,
-                    before = stats.before_len,
-                    after = stats.after_len,
-                    "Pruned cache after loading dump"
-                );
-            }
-        });
-    }
-
     fn spawn_dump_task(
         &self,
         cache_map: CacheMap,
@@ -1264,6 +1237,27 @@ impl Plugin for Cache {
     async fn init(&mut self, _context: &crate::plugin::PluginInitContext<'_>) -> Result<()> {
         let cache_map = CacheMap::with_capacity(Self::initial_cache_capacity(self.cache_size));
 
+        // Finish restoration before exposing the map or starting writers. A
+        // failed reload can destroy this plugin immediately after
+        // initialization.
+        if let Some(dump_file) = &self.config.dump_file {
+            load_cache_from_file(&cache_map, dump_file, self.ecs_in_key).await?;
+            let stats = Self::prune_cache_after_load(
+                &cache_map,
+                self.cache_size,
+                AppClock::elapsed_millis(),
+            );
+            if stats.total_removed() > 0 {
+                debug!(
+                    expired_removed = stats.expired_removed,
+                    evicted = stats.evicted,
+                    before = stats.before_len,
+                    after = stats.after_len,
+                    "Pruned cache after loading dump"
+                );
+            }
+        }
+
         let _ = self.cache_map.set(cache_map.clone());
         self.metrics.set_cache_map(cache_map.clone());
 
@@ -1277,12 +1271,6 @@ impl Plugin for Cache {
         register_metric_source(self.metrics.clone())?;
 
         if let Some(dump_file) = &self.config.dump_file {
-            self.spawn_load_task(
-                cache_map.clone(),
-                dump_file.clone(),
-                self.ecs_in_key,
-                self.cache_size,
-            );
             let dump_interval = self.config.dump_interval.unwrap_or(DEFAULT_DUMP_INTERVAL);
             let task_handle = match self.spawn_dump_task(
                 cache_map.clone(),
@@ -1874,6 +1862,60 @@ mod tests {
             min_positive_ttl: None,
             ecs_in_key: None,
         }
+    }
+
+    #[tokio::test]
+    async fn immediate_destroy_preserves_restored_dump() {
+        AppClock::start();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.dump");
+        let dump_path = path.to_str().unwrap();
+        let original = CacheMap::with_capacity(128);
+        let now = AppClock::elapsed_millis();
+        for index in 0..64 {
+            let domain = format!("entry-{index}.example.com.");
+            let mut context = make_context(make_request_with_query(&domain, false, false));
+            let key = Cache::build_cache_key(&mut context, false).unwrap();
+            original.insert_or_update_with_meta(
+                key,
+                Arc::new(CacheItem::new_validated(
+                    cacheable_response_for_domain(&domain, 3600),
+                    3600,
+                    now + 3_600_000,
+                )),
+                now,
+                now + 3_600_000,
+                now,
+            );
+        }
+        dump_cache_to_file(&original, dump_path).await.unwrap();
+
+        let mut config = default_test_config();
+        config.dump_file = Some(dump_path.to_string());
+        let mut cache = test_cache(config);
+        cache.init_for_test().await.unwrap();
+        // No scheduler yield: a following plugin can fail immediately.
+        assert_eq!(cache.cache_map.get().unwrap().len(), 64);
+        cache.destroy().await.unwrap();
+
+        let restored = CacheMap::with_capacity(128);
+        load_cache_from_file(&restored, dump_path, false)
+            .await
+            .unwrap();
+        assert_eq!(restored.len(), 64);
+    }
+
+    #[tokio::test]
+    async fn failed_restore_does_not_publish_a_writable_cache() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = default_test_config();
+        // NUL is an invalid file name on every supported platform.
+        config.dump_file = Some(format!("{}\0invalid", directory.path().display()));
+        let mut cache = test_cache(config);
+        assert!(cache.init_for_test().await.is_err());
+        assert!(cache.cache_map.get().is_none());
+        cache.destroy().await.unwrap();
+        assert!(directory.path().is_dir());
     }
 
     #[test]
