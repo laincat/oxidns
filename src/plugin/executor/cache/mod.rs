@@ -464,6 +464,26 @@ pub struct Cache {
 }
 
 impl Cache {
+    async fn stop_background_tasks(&self) {
+        unregister_metric_source(&self.tag);
+        let dump_task_handle = self
+            .dump_task_handle
+            .lock()
+            .expect("dump_task_handle poisoned")
+            .take();
+        let cleanup_task_handle = self
+            .cleanup_task_handle
+            .lock()
+            .expect("cleanup_task_handle poisoned")
+            .take();
+        if let Some(handle) = dump_task_handle {
+            handle.stop().await;
+        }
+        if let Some(handle) = cleanup_task_handle {
+            handle.stop().await;
+        }
+    }
+
     fn spawn_dump_task(
         &self,
         cache_map: CacheMap,
@@ -1241,7 +1261,11 @@ impl Plugin for Cache {
         // failed reload can destroy this plugin immediately after
         // initialization.
         if let Some(dump_file) = &self.config.dump_file {
-            load_cache_from_file(&cache_map, dump_file, self.ecs_in_key).await?;
+            load_cache_from_file(&cache_map, dump_file, self.ecs_in_key)
+                .await
+                .map_err(|error| {
+                    DnsError::plugin(format!("failed to load cache dump '{dump_file}': {error}"))
+                })?;
             let stats = Self::prune_cache_after_load(
                 &cache_map,
                 self.cache_size,
@@ -1313,30 +1337,18 @@ impl Plugin for Cache {
     }
 
     async fn destroy(&self) -> Result<()> {
-        unregister_metric_source(&self.tag);
-        let dump_task_handle = self
-            .dump_task_handle
-            .lock()
-            .expect("dump_task_handle poisoned")
-            .take();
-        let cleanup_task_handle = self
-            .cleanup_task_handle
-            .lock()
-            .expect("cleanup_task_handle poisoned")
-            .take();
-
-        if let Some(handle) = dump_task_handle {
-            handle.stop().await;
-        }
-        if let Some(handle) = cleanup_task_handle {
-            handle.stop().await;
-        }
+        self.stop_background_tasks().await;
         if let Some(dump_file) = &self.config.dump_file
             && let Some(cache_map) = self.cache_map.get()
             && let Err(e) = dump_cache_to_file(cache_map, dump_file).await
         {
             warn!("Failed to dump cache to {}: {}", dump_file, e);
         }
+        Ok(())
+    }
+
+    async fn rollback_init(&self) -> Result<()> {
+        self.stop_background_tasks().await;
         Ok(())
     }
 }
@@ -1864,12 +1876,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn immediate_destroy_preserves_restored_dump() {
-        AppClock::start();
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("cache.dump");
-        let dump_path = path.to_str().unwrap();
+    async fn write_test_dump(dump_path: &str) {
         let original = CacheMap::with_capacity(128);
         let now = AppClock::elapsed_millis();
         for index in 0..64 {
@@ -1889,6 +1896,15 @@ mod tests {
             );
         }
         dump_cache_to_file(&original, dump_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn immediate_destroy_preserves_restored_dump() {
+        AppClock::start();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.dump");
+        let dump_path = path.to_str().unwrap();
+        write_test_dump(dump_path).await;
 
         let mut config = default_test_config();
         config.dump_file = Some(dump_path.to_string());
@@ -1903,6 +1919,80 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(restored.len(), 64);
+    }
+
+    #[tokio::test]
+    async fn rollback_does_not_overwrite_dump_with_pruned_cache() {
+        AppClock::start();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.dump");
+        let dump_path = path.to_str().unwrap();
+        write_test_dump(dump_path).await;
+
+        let mut config = default_test_config();
+        config.dump_file = Some(dump_path.to_string());
+        config.size = Some(1);
+        let mut cache = test_cache(config);
+        cache.init_for_test().await.unwrap();
+        assert_eq!(cache.cache_map.get().unwrap().len(), 1);
+        cache.rollback_init().await.unwrap();
+
+        let restored = CacheMap::with_capacity(128);
+        load_cache_from_file(&restored, dump_path, false)
+            .await
+            .unwrap();
+        assert_eq!(restored.len(), 64);
+    }
+
+    #[tokio::test]
+    async fn failed_runtime_initialization_preserves_cache_dump() {
+        AppClock::start();
+        #[cfg(debug_assertions)]
+        crate::plugin::enable_runtime_test_serialization();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.dump");
+        let dump_path = path.to_str().unwrap();
+        write_test_dump(dump_path).await;
+        let original = tokio::fs::read(&path).await.unwrap();
+        let yaml_path = serde_json::to_string(dump_path).unwrap();
+        let config: crate::config::types::Config = serde_yaml_ng::from_str(&format!(
+            "plugins:\n  - tag: aa_cache\n    type: cache\n    args:\n      size: 1\n      dump_file: {yaml_path}\n  - tag: zz_invalid_forward\n    type: forward\n    args:\n      upstreams: []\n"
+        ))
+        .unwrap();
+
+        let error = crate::plugin::init(config).await.unwrap_err();
+        assert!(error.to_string().contains("at least one upstream"));
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), original);
+    }
+
+    #[cfg(feature = "api")]
+    #[tokio::test]
+    async fn failed_api_start_preserves_cache_dump_after_initialization() {
+        AppClock::start();
+        #[cfg(debug_assertions)]
+        crate::plugin::enable_runtime_test_serialization();
+        let _guard = crate::api::global_api_test_guard().await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.dump");
+        let dump_path = path.to_str().unwrap();
+        write_test_dump(dump_path).await;
+        let original = tokio::fs::read(&path).await.unwrap();
+        let yaml_path = serde_json::to_string(dump_path).unwrap();
+        let config: crate::config::types::Config = serde_yaml_ng::from_str(&format!(
+            "api:\n  http: \"{address}\"\nplugins:\n  - tag: aa_cache\n    type: cache\n    args:\n      size: 1\n      dump_file: {yaml_path}\n"
+        ))
+        .unwrap();
+
+        let error = crate::app::bootstrap::assemble(&config, None)
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("failed to bind API listener"),
+            "{error}"
+        );
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), original);
     }
 
     #[tokio::test]

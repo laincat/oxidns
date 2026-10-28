@@ -37,6 +37,8 @@ pub use dependency::DependencyGraphReport;
 use futures::future::BoxFuture;
 #[cfg(debug_assertions)]
 pub use registry::enable_runtime_test_serialization;
+#[cfg(feature = "api")]
+pub(crate) use registry::rollback_runtime;
 pub use registry::{
     PluginBuildSession, PluginCatalog, PluginInitContext, PluginRegistry, PluginResolver,
     PluginRuntime, PluginRuntimeManager, clear_app_controller, current_runtime, destroy_runtime,
@@ -352,6 +354,11 @@ pub trait Plugin: Debug + Send + Sync + 'static {
     /// Clean up plugin resources (called during shutdown)
     async fn destroy(&self) -> Result<()> {
         Ok(())
+    }
+
+    /// Undo initialization when the candidate runtime cannot start.
+    async fn rollback_init(&self) -> Result<()> {
+        self.destroy().await
     }
 }
 

@@ -68,14 +68,14 @@ pub async fn assemble(
     if let Some(api_hub) = &api_hub {
         let register = ApiRegister::new(api_hub.clone());
         if let Err(err) = api::register_plugin_runtime_control_routes(&register, &runtime) {
-            plugin::destroy_runtime().await;
+            plugin::rollback_runtime().await;
             clear_global_api();
             plugin::clear_app_controller();
             return Err(err);
         }
         api_hub.mark_plugins_initialized(runtime.plugin_count(), runtime.server_plugin_count());
         if let Err(err) = api_hub.start().await {
-            plugin::destroy_runtime().await;
+            plugin::rollback_runtime().await;
             clear_global_api();
             plugin::clear_app_controller();
             return Err(err);

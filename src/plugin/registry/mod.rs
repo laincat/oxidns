@@ -35,6 +35,8 @@ use init_plan::{build_create_contexts, build_runtime_init_plan};
 use runtime::TestRuntimeGuard;
 #[cfg(debug_assertions)]
 pub use runtime::enable_runtime_test_serialization;
+#[cfg(feature = "api")]
+pub(crate) use runtime::rollback_runtime;
 pub use runtime::{
     PluginRuntimeManager, clear_app_controller, current_runtime, destroy_runtime, global_manager,
     init, plugin_count, reload_provider, request_app_reload, request_app_restart,
@@ -630,6 +632,14 @@ impl PluginRegistry {
 
     /// Destroy all initialized plugins in reverse init order
     pub async fn destroy(&self) {
+        self.destroy_plugins(false).await;
+    }
+
+    pub(crate) async fn rollback_init(&self) {
+        self.destroy_plugins(true).await;
+    }
+
+    async fn destroy_plugins(&self, rollback: bool) {
         let order = lock_mutex(&self.init_order).clone();
 
         if order.is_empty() {
@@ -645,7 +655,12 @@ impl PluginRegistry {
                 if let Some(control) = entry.1.runtime_control() {
                     control.drain().await;
                 }
-                if let Err(err) = entry.1.as_plugin().destroy().await {
+                let result = if rollback {
+                    entry.1.as_plugin().rollback_init().await
+                } else {
+                    entry.1.as_plugin().destroy().await
+                };
+                if let Err(err) = result {
                     error!(
                         plugin = %tag,
                         error = %err,

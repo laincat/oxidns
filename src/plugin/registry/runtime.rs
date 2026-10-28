@@ -96,7 +96,7 @@ impl PluginRuntimeManager {
                 )
                 .await
             {
-                candidate.destroy().await;
+                candidate.rollback_init().await;
                 outbound::clear_global();
                 return Err(err);
             }
@@ -111,13 +111,21 @@ impl PluginRuntimeManager {
     }
 
     pub async fn destroy_runtime(self: &Arc<Self>) {
+        self.stop_runtime(false).await;
+    }
+
+    async fn stop_runtime(self: &Arc<Self>, rollback: bool) {
         let lifecycle_guard = self.lifecycle.clone().lock_owned().await;
         let manager = self.clone();
         let task = tokio::spawn(async move {
             let _lifecycle_guard = lifecycle_guard;
             let previous = write_rwlock(&manager.current).take();
             if let Some(previous) = previous {
-                previous.destroy().await;
+                if rollback {
+                    previous.rollback_init().await;
+                } else {
+                    previous.destroy().await;
+                }
             }
             outbound::clear_global();
         });
@@ -210,6 +218,11 @@ pub async fn init(config: Config) -> Result<Arc<PluginRuntime>> {
 
 pub async fn destroy_runtime() {
     global_manager().destroy_runtime().await;
+}
+
+#[cfg(feature = "api")]
+pub(crate) async fn rollback_runtime() {
+    global_manager().stop_runtime(true).await;
 }
 
 pub fn set_app_controller(controller: Arc<AppController>) {
