@@ -1431,9 +1431,9 @@ function TopBucketsCard({
                       color: "var(--foreground)",
                       fontSize: 12,
                     }}
-                    formatter={(value: number, _name, props) => [
+                    formatter={(value, _name, props) => [
                       t(WEBUI.queryRecorder.timesWithPercent, {
-                        count: value,
+                        count: Number(value ?? 0),
                         pct: formatPercent(
                           (props.payload?.share as number) ?? 0,
                         ),
@@ -1639,9 +1639,9 @@ function DistributionCard({
                       color: "var(--foreground)",
                       fontSize: 12,
                     }}
-                    formatter={(value: number, _name, props) => [
+                    formatter={(value, _name, props) => [
                       t(WEBUI.queryRecorder.timesWithPercent, {
-                        count: value,
+                        count: Number(value ?? 0),
                         pct: formatPercent(
                           (props.payload?.share as number) ?? 0,
                         ),
@@ -1665,9 +1665,9 @@ function DistributionCard({
                       color: "var(--foreground)",
                       fontSize: 12,
                     }}
-                    formatter={(value: number, _name, props) => [
+                    formatter={(value, _name, props) => [
                       t(WEBUI.queryRecorder.timesWithPercent, {
-                        count: value,
+                        count: Number(value ?? 0),
                         pct: formatPercent(
                           (props.payload?.share as number) ?? 0,
                         ),

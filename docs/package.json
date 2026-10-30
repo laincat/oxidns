@@ -37,7 +37,7 @@
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.10.2",
     "@docusaurus/types": "^3.10.2",
-    "dotenv-cli": "^11.0.0"
+    "dotenv-cli": "^11.1.0"
   },
   "overrides": {
     "tinypool@<2.1.2": "^2.1.2",
