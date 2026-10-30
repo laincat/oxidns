@@ -437,10 +437,10 @@ fn connection_destinations_command(family: RouteFamily, destinations: &[IpAddr])
         command = command.query_equal(CONNECTION_DST_FIELD, &ip.to_string());
     }
     if destinations.len() > 1 {
-        command = command.query_operations(std::iter::repeat_n(
-            QueryOperator::Or,
-            destinations.len().saturating_sub(1),
-        ));
+        command = command.query_operations(&vec![
+            QueryOperator::Or;
+            destinations.len().saturating_sub(1)
+        ]);
     }
     command.build()
 }

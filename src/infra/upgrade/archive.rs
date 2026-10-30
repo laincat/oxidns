@@ -40,7 +40,7 @@ pub(super) fn unpack_zip(archive: &Path, out_dir: &Path) -> Result<()> {
         let Some(rel_path) = entry.enclosed_name() else {
             return Err(DnsError::runtime(format!(
                 "refusing to extract zip entry with unsafe path: '{}'",
-                entry.name()
+                String::from_utf8_lossy(entry.name_raw())
             )));
         };
         let dest = out_dir_canon.join(&rel_path);
@@ -61,8 +61,9 @@ pub(super) fn unpack_zip(archive: &Path, out_dir: &Path) -> Result<()> {
         let mut out = File::create(&dest).map_err(|e| {
             DnsError::runtime(format!("failed to create '{}': {e}", dest.display()))
         })?;
-        std::io::copy(&mut entry, &mut out)
-            .map_err(|e| DnsError::runtime(format!("failed to extract '{}': {e}", entry.name())))?;
+        std::io::copy(&mut entry, &mut out).map_err(|e| {
+            DnsError::runtime(format!("failed to extract '{}': {e}", rel_path.display()))
+        })?;
     }
     Ok(())
 }

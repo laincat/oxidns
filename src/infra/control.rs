@@ -170,7 +170,9 @@ pub struct AppController {
     config_path: PathBuf,
     state: Mutex<ControlState>,
     command_tx: mpsc::UnboundedSender<ControlCommand>,
-    sysinfo: Mutex<System>,
+    /// `None` when sysinfo cannot initialize on this platform; process
+    /// metrics then report zero CPU/memory instead of failing startup.
+    sysinfo: Mutex<Option<System>>,
     #[cfg(windows)]
     windows_memory_sampler: WindowsMemorySampler,
 }
@@ -234,10 +236,24 @@ impl AppController {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pid = Pid::from_u32(std::process::id());
         let refresh_kind = ProcessRefreshKind::nothing().with_cpu().with_memory();
-        let mut sys =
-            System::new_with_specifics(RefreshKind::nothing().with_processes(refresh_kind));
-        // Prime the CPU baseline so the first real sample isn't always 0%.
-        sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[pid]), false, refresh_kind);
+        let sys = match System::new_with_specifics(
+            RefreshKind::nothing().with_processes(refresh_kind),
+        ) {
+            Ok(mut sys) => {
+                // Prime the CPU baseline so the first real sample isn't always
+                // 0%.
+                sys.refresh_processes_specifics(
+                    ProcessesToUpdate::Some(&[pid]),
+                    false,
+                    refresh_kind,
+                );
+                Some(sys)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to initialize sysinfo; process metrics disabled");
+                None
+            }
+        };
         (
             Arc::new(Self {
                 started_at_ms: AppClock::elapsed_millis(),
@@ -255,23 +271,28 @@ impl AppController {
     pub fn sample_process_metrics(&self) -> ProcessMetrics {
         let pid = Pid::from_u32(std::process::id());
         let (cpu_percent, working_set_bytes, system_memory_total_mb) = {
-            let mut sys = self.sysinfo.lock().expect("sysinfo poisoned");
-            sys.refresh_memory();
-            sys.refresh_processes_specifics(
-                ProcessesToUpdate::Some(&[pid]),
-                false,
-                ProcessRefreshKind::nothing().with_cpu().with_memory(),
-            );
-            let cpu_count = sys.cpus().len().max(1) as f32;
-            let (cpu_percent, working_set_bytes) = sys
-                .process(pid)
-                .map(|p| (p.cpu_usage() / cpu_count, p.memory()))
-                .unwrap_or((0.0, 0));
-            (
-                cpu_percent,
-                working_set_bytes,
-                sys.total_memory() / 1_048_576,
-            )
+            let mut guard = self.sysinfo.lock().expect("sysinfo poisoned");
+            match guard.as_mut() {
+                None => (0.0, 0, 0),
+                Some(sys) => {
+                    sys.refresh_memory();
+                    sys.refresh_processes_specifics(
+                        ProcessesToUpdate::Some(&[pid]),
+                        false,
+                        ProcessRefreshKind::nothing().with_cpu().with_memory(),
+                    );
+                    let cpu_count = sys.cpus().len().max(1) as f32;
+                    let (cpu_percent, working_set_bytes) = sys
+                        .process(pid)
+                        .map(|p| (p.cpu_usage() / cpu_count, p.memory()))
+                        .unwrap_or((0.0, 0));
+                    (
+                        cpu_percent,
+                        working_set_bytes,
+                        sys.total_memory() / 1_048_576,
+                    )
+                }
+            }
         };
         #[cfg(windows)]
         let (memory_bytes, memory_kind) = self.windows_memory_sampler.sample(working_set_bytes);
